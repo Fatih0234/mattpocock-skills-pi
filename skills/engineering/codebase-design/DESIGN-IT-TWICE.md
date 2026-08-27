@@ -1,44 +1,59 @@
 # Design It Twice
 
-When the user wants to explore alternative interfaces for a chosen deepening candidate, use this parallel sub-agent pattern. Based on "Design It Twice" (Ousterhout): your first idea is unlikely to be the best.
+When the user wants to explore alternative interfaces for a chosen deepening candidate, use isolated Pi designers in parallel. Based on "Design It Twice" (Ousterhout): your first idea is unlikely to be the best.
 
-Uses the vocabulary in [SKILL.md](SKILL.md): **module**, **interface**, **seam**, **adapter**, **leverage**.
+Uses the vocabulary in [SKILL.md](SKILL.md): **module**, **interface**, **seam**, **adapter**, **leverage**, **locality**.
 
 ## Process
 
 ### 1. Frame the problem space
 
-Before spawning sub-agents, write a user-facing explanation of the problem space for the chosen candidate:
+Write a user-facing explanation of the chosen candidate:
 
-- The constraints any new interface would need to satisfy
-- The dependencies it would rely on, and which category they fall into (see [DEEPENING.md](DEEPENING.md))
-- A rough illustrative code sketch to ground the constraints, not a proposal, just a way to make the constraints concrete
+- The constraints every new interface must satisfy
+- The dependencies it relies on and their categories from [DEEPENING.md](DEEPENING.md)
+- A rough illustrative code sketch that grounds the constraints without proposing an answer
 
-Show this to the user, then immediately proceed to Step 2. The user reads and thinks while the sub-agents work in parallel.
+Show this to the user, then proceed to delegation. The user can read it while the designers run, but the parent Pi waits for the dispatch to finish.
 
-### 2. Spawn sub-agents
+### 2. Allocate design artifacts
 
-Spawn 3+ sub-agents in parallel. Each must produce a **radically different** interface for the deepened module.
+Capture `git status --short`. Create a unique run directory at `.scratch/pi-agents/design-it-twice-<timestamp>/` with one artifact per design:
 
-Prompt each sub-agent with a separate technical brief (file paths, coupling details, dependency category from [DEEPENING.md](DEEPENING.md), what sits behind the seam). The brief is independent of the user-facing problem-space explanation in Step 1. Give each agent a different design constraint:
+```text
+design-minimal-interface.md
+design-locality.md
+design-testability.md
+```
 
-- Agent 1: "Minimize the interface: aim for 1–3 entry points max. Maximise leverage per entry point."
-- Agent 2: "Maximise flexibility: support many use cases and extension."
-- Agent 3: "Optimise for the most common caller: make the default case trivial."
-- Agent 4 (if applicable): "Design around ports & adapters for cross-seam dependencies."
+Add `design-ports-and-adapters.md` when the candidate crosses a process, network, storage, or third-party seam.
 
-Include both [SKILL.md](SKILL.md) vocabulary and CONTEXT.md vocabulary in the brief so each sub-agent names things consistently with the architecture language and the project's domain language.
+### 3. Delegate independent designs
 
-Each sub-agent outputs:
+Invoke the Pi `subagent` tool with `async: false` and a `workflowScript` using `await runs.all([...])`. Use agent `interface-designer` for every child with `context: "fresh"` and `worktree: false`, plus a separate technical brief and exact artifact path. Each brief includes relevant file paths, coupling details, dependency category, what sits behind the seam, [SKILL.md](SKILL.md) vocabulary, and the project's `CONTEXT.md` vocabulary.
 
-1. Interface (types, methods, params, plus invariants, ordering, error modes)
-2. Usage example showing how callers use it
-3. What the implementation hides behind the seam
-4. Dependency strategy and adapters (see [DEEPENING.md](DEEPENING.md))
-5. Trade-offs: where leverage is high, where it's thin
+Give each designer one constraint:
 
-### 3. Present and compare
+1. **Minimal interface**: aim for one to three entry points and maximize leverage per entry point.
+2. **Locality**: concentrate knowledge and likely change inside the module, even when that costs a slightly wider interface.
+3. **Testability**: make important behavior observable through the interface with the fewest test seams and adapters.
+4. **Ports and adapters**, when applicable: isolate cross-seam dependencies behind explicit ports and concrete adapters.
 
-Present designs sequentially so the user can absorb each one, then compare them in prose. Contrast by **depth** (leverage at the interface), **locality** (where change concentrates), and **seam placement**.
+A designer must not read another design artifact. Every design must contain:
 
-After comparing, give your own recommendation: which design you think is strongest and why. If elements from different designs would combine well, propose a hybrid. Be opinionated: the user wants a strong read, not a menu.
+1. Interface types, methods, parameters, invariants, ordering, and error modes
+2. A caller example
+3. Behavior hidden behind the seam
+4. Dependency and adapter strategy
+5. Test surface
+6. Tradeoffs in depth, leverage, locality, and seam placement
+
+After delegation, compare `git status --short` with the captured state. The only new paths attributable to designers must be their assigned artifacts. Stop and report any unexpected change.
+
+If the `subagent` tool is unavailable, produce the designs in separate sequential passes, write the same artifacts, and disclose that they were not context-isolated.
+
+### 4. Present and compare
+
+Read and present the designs sequentially so the user can absorb each one. Compare them in prose by **depth**, **locality**, **leverage**, **testability**, and **seam placement**.
+
+Give a recommendation. If elements combine well, propose a concrete hybrid. Be opinionated: the user wants a strong read, not a menu.

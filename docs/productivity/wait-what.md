@@ -6,7 +6,7 @@ The skill is three lines long. That is the design, not an unfinished draft. Skil
 
 ## When to reach for it
 
-You invoke it by typing `/wait-what`. The agent will not reach for it on its own, and it shouldn't. Only you know when you stopped following.
+You invoke it by typing `/skill:wait-what`. The agent will not reach for it on its own, and it shouldn't. Only you know when you stopped following.
 
 Use it the second you notice you're skimming. The agent has drifted into jargon it invented, stacked five acronyms, or explained a decision whose premise you never saw. It fixes the conversation you're already in. To stop the jargon arriving at all, use [grill-with-docs](https://aihero.dev/skills-grill-with-docs), which builds the shared language upfront.
 
@@ -23,6 +23,16 @@ The skill says re-pitch **that**, not "that last message". What lost you is usua
 The body reuses the leading words already in your global `CLAUDE.md` and your project's `CONTEXT.md`. ASD-STE100 Simplified Technical English sets the register. The ubiquitous language supplies the nouns. The skill, `CLAUDE.md` and `CONTEXT.md` reach for the same [tokens](https://www.aihero.dev/ai-coding-dictionary/token), so invoking it is not a new instruction. It is a reminder of one the agent already agreed to.
 
 If you have no `CONTEXT.md` (and no `CONTEXT-MAP.md` pointing to one for the context at hand), the skill still works. You lose only the domain-vocabulary half.
+
+## Common questions
+
+**Does this change the answer or only its wording?**
+
+It re-pitches the existing answer. If the answer itself is wrong, ask the agent to revisit the decision or evidence instead.
+
+**Do I need a `CONTEXT.md`?**
+
+No. The skill still supplies missing context and simpler language. A project glossary only makes its noun choices more consistent.
 
 ## It's working if
 

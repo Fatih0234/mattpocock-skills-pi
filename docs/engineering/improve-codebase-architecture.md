@@ -8,7 +8,7 @@ Two filters keep the report from becoming generic cleanup advice. Every candidat
 
 ## When to reach for it
 
-You invoke this by typing `/improve-codebase-architecture`; the [agent](https://www.aihero.dev/ai-coding-dictionary/agent) will not reach for it on its own.
+You invoke this by typing `/skill:improve-codebase-architecture`; the [agent](https://www.aihero.dev/ai-coding-dictionary/agent) will not reach for it on its own.
 
 It sits outside the build loop: it is not a step in the main loop but something you run periodically to queue up more work to improve the codebase. The four situations it gets used in:
 
@@ -29,7 +29,7 @@ Where it is confusable with siblings:
 
 None to run it. It reads `CONTEXT.md` and any ADRs in `docs/adr/` if they exist, and speaks in your domain's own nouns when they do: a candidate reads as "deepen the Order intake module," not "refactor the FooBarHandler."
 
-It writes in two places. The report goes to `<tmpdir>/architecture-review-<timestamp>.html`, outside the repo. During the grilling loop it will add or sharpen terms in `CONTEXT.md`, creating that file if it does not exist, and offer to record a rejected candidate as an ADR so a future run does not re-suggest it.
+The isolated Pi `repo-scout` first writes its evidence report under `.scratch/pi-agents/architecture-scan-<timestamp>/`. The parent validates that artifact and writes the visual report to `<tmpdir>/architecture-review-<timestamp>.html`, outside the repo. During the grilling loop the parent may add or sharpen terms in `CONTEXT.md`, creating that file if needed, and offer to record a rejected candidate as an ADR so a future run does not re-suggest it.
 
 ## Depth, and the report that hunts for it
 
@@ -61,7 +61,7 @@ The report loads Tailwind and Mermaid from CDNs, so it needs network access when
 
 **It gave me twelve candidates. Do I work through them in the same session or start a new one?**
 
-One candidate per session. Working through several in one conversation fills the [context window](https://www.aihero.dev/ai-coding-dictionary/context-window) with the report, the grilling, the domain-model edits and the code changes all at once. The report only lives in a temp file, so carry the candidate itself rather than the file: pick one, grill it, take the decision into `/to-spec`, and turn the rest into [tickets](https://www.aihero.dev/ai-coding-dictionary/ticket) you can pick up independently later. Put the chosen improvement into a spec rather than going straight to implementation. This is a recurring question with no documented workflow in the skill itself.
+One candidate per session. Working through several in one conversation fills the [context window](https://www.aihero.dev/ai-coding-dictionary/context-window) with the report, the grilling, the domain-model edits and the code changes all at once. The report only lives in a temp file, so carry the candidate itself rather than the file: pick one, grill it, take the decision into `/skill:to-spec`, and turn the rest into [tickets](https://www.aihero.dev/ai-coding-dictionary/ticket) you can pick up independently later. Put the chosen improvement into a spec rather than going straight to implementation. This is a recurring question with no documented workflow in the skill itself.
 
 **How should I prompt it?**
 
@@ -71,17 +71,17 @@ With the next thing you are building in mind. Where a big build is coming up, po
 
 Partly. It is strong on big existing codebases lacking consistent structure, and it is the recommended upkeep mechanism after any one-time structural setup. The honest counterweight: users with genuinely out-of-control projects report it "helped a little but still doesn't seem to cut it," and one developer with an eight-year legacy codebase reported the model going in circles where the same skill produces a clean graph on a tidy repo. There is no dedicated `/refactor` skill for that case yet. If the codebase has no shared vocabulary at all, [grill-with-docs](https://aihero.dev/skills-grill-with-docs) to establish one first tends to make this skill's output much better.
 
-**How is this different from `/codebase-design`?**
+**How is this different from `/skill:codebase-design`?**
 
-`/codebase-design` is a reference, not a session driver. It supplies the vocabulary (module, interface, depth, seam, adapter, leverage, locality), and this skill borrows it. Pointing a fresh agent at `/codebase-design` as the thing to "do" is a known failure: with no process of its own to follow, the agent invents one, re-explores code and runs for a very long time before asking you anything. Drive with this skill; consume that one.
+`/skill:codebase-design` is a reference, not a session driver. It supplies the vocabulary (module, interface, depth, seam, adapter, leverage, locality), and this skill borrows it. Pointing a fresh agent at `/skill:codebase-design` as the thing to "do" is a known failure: with no process of its own to follow, the agent invents one, re-explores code and runs for a very long time before asking you anything. Drive with this skill; consume that one.
 
 **Will it ever tell me the codebase is fine?**
 
 Rarely, and you should know that going in. The skill is built to output findings, so the framing pushes it toward producing candidates rather than concluding that nothing is wrong. The strength badges are the defence: a report where everything is `Speculative` is the skill telling you it found nothing, in the only way it knows how.
 
-**Does it work in Codex or another harness?**
+**How does exploration work in Pi?**
 
-Partially. The exploration step names Claude Code's `Agent` tool with `subagent_type=Explore` directly, so a [harness](https://www.aihero.dev/ai-coding-dictionary/harness) without that tool may skip the parallel exploration rather than substitute its own. The skill still runs; the scan is just less thorough. A harness-neutral rewrite has been proposed but is not merged.
+The parent scopes the scan, then invokes the `repo-scout` role through Pi's `subagent` tool. The scout has isolated model context and writes one assigned evidence report. The parent waits for it, verifies the working tree, and uses the report to build the HTML candidate view.
 
 **How do I actually implement deep modules in TypeScript?**
 
@@ -91,7 +91,7 @@ There is no good answer shipped with the skill. The recurring request is for a `
 
 - The candidates name your domain's concepts, not invented class names: "the Order intake module," not "the FooBarHandler."
 - The candidates cluster in files you have edited recently, not in dormant corners of the repo.
-- No code changed during the run. The only new file is the HTML report in your temp directory.
+- No code changed during the scan. The only child-authored file is the assigned scout report under `.scratch/pi-agents/`, and the parent writes the HTML report in the OS temp directory.
 - It stops after the report and asks which candidate you want, rather than continuing on its own.
 - Each card explains the payoff as locality or leverage, and says which tests get simpler, not just "this is cleaner."
 - Rejecting a candidate for a durable reason gets you an offer to record an ADR, so the next run does not re-suggest it.

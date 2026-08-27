@@ -1,0 +1,11 @@
+{
+  "asyncByDefault": true,
+  "defaultSubagentContext": "fresh",
+  "maxSubagentDepth": 2,
+  "maxActiveAsyncRunsPerSession": 4,
+  "parallel": {
+    "maxTasks": 8,
+    "concurrency": 4
+  },
+  "worktreeBaseDir": "~/.cache/pi-subagents/worktrees"
+}

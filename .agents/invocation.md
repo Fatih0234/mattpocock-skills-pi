@@ -13,13 +13,13 @@ Bucket `README.md`s and the top-level `README.md` group entries into **User-invo
 
 ## Dependencies between them
 
-Dependencies are expressed as an explicit instruction to **call the Skill tool** with the named skill (`Call the Skill tool with "grilling"`), not deep `../other-skill/FILE.md` cross-references, and not a bare `/skill`-style mention left for the model to interpret. Naming the tool is what gets it fired: most harnesses expose skill invocation as a tool the model calls, and spelling that out gets a higher hit rate than dropping a `/name` into prose and hoping it's read as a command. Dropping the leading `/` also keeps this harness-neutral rather than less: a skill name on its own carries no assumption about which harness's trigger syntax it belongs to. Shared reference docs live inside the skill that owns them; other skills reach that material by calling the Skill tool with it, not by linking across folders.
+This Pi integration has no separate Skill tool. An operative dependency is expressed as **load and follow the named skill**. Pi advertises each available skill with its `SKILL.md` path, and the agent uses `read` to load that file before following it. Do not use deep `../other-skill/FILE.md` cross-references: shared reference lives inside the skill that owns it, and another skill reaches that material by loading the owner.
 
-This is about **operative** instructions: a skill's own steps telling the agent to go run another skill right now. Router prose that just names skills for a human to pick from (`ask-matt`, bucket `README.md`s) isn't invoking anything, so it keeps `/skill`-style names as plain labels.
+This is about **operative** instructions: a skill's own steps telling the agent to apply another skill now. Router prose that names skills for a human to pick from (`ask-matt`, bucket `README.md`s) is not invoking anything, so it uses Pi's user-facing `/skill:<name>` labels.
 
-The Skill tool takes one skill per call. A step that needs two skills is two calls, not one call with two names: say so (`Call the Skill tool twice, for "grilling" and "domain-modeling"`), not "call it with X and Y," which reads as a single call taking both.
+A step that needs two model-invoked skills says to load and follow both, naming each explicitly. Loading does not create a new context boundary; both instruction sets run in the current parent session unless the skill explicitly invokes the Pi `subagent` tool.
 
-This whole convention only holds when the named skill is **model-invoked**. A user-invoked skill can never be reached this way, full stop: per the invariant above, no other skill can call it, including by naming it to the Skill tool. When a step's precondition is a user-invoked skill (e.g. `setup-matt-pocock-skills`), phrase it as an instruction for the human to act on: "tell the user to run `/setup-matt-pocock-skills`", never as a Skill tool call.
+This convention only holds when the named skill is **model-invoked**. A user-invoked skill remains reachable only by the human. When a step's precondition is user-invoked (for example `setup-matt-pocock-skills`), tell the user to run `/skill:setup-matt-pocock-skills` rather than trying to load it as an operative dependency.
 
 ## Passive vs active domain work
 
