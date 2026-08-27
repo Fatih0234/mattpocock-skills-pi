@@ -6,14 +6,14 @@ It recommends and stops. It does not grill, write a [spec](https://www.aihero.de
 
 ## When to reach for it
 
-You invoke this by typing `/ask-matt`; the agent won't reach for it on its own.
+You invoke this by typing `/skill:ask-matt`; the agent won't reach for it on its own.
 
 | Your situation | What the router gives back |
 | --- | --- |
 | An idea, and no idea where to start | The head of the main flow, and whether the build is small enough to skip the spec |
 | Bugs and requests arriving from other people | The [triage](https://aihero.dev/skills-triage) on-ramp, and why [tickets](https://www.aihero.dev/ai-coding-dictionary/ticket) you generated yourself don't belong on it |
 | Two skills that look interchangeable | The line between them, and it is usually one concrete test rather than a matter of taste. [grill-me](https://aihero.dev/skills-grill-me) or [grill-with-docs](https://aihero.dev/skills-grill-with-docs) turns on whether you are in a working directory; [grill-with-docs](https://aihero.dev/skills-grill-with-docs) or [wayfinder](https://aihero.dev/skills-wayfinder) turns on whether the effort fits one session |
-| A long session and a decision about the [context](https://www.aihero.dev/ai-coding-dictionary/context) | The ordered tree over the five options at a phase boundary |
+| A long session and a decision about the [context](https://www.aihero.dev/ai-coding-dictionary/context) | The ordered tree over the six Pi options at a phase boundary |
 | A skill you have already picked | Nothing useful. Invoke that skill directly. |
 
 ## Prerequisites
@@ -33,27 +33,28 @@ The word the skill gives you to think with is **flow**: a path *through* the ski
 
 ## The phase boundary
 
-The other idea it hands you is the **phase boundary**. A phase is a chunk of work inside a session (the [grilling](https://www.aihero.dev/ai-coding-dictionary/grilling), the implementation, the QA), and the boundary between two of them is the only place the question "what do I do with this context?" belongs. Mid-phase there is nothing to decide: continue, or split what is left into [subagents](https://www.aihero.dev/ai-coding-dictionary/subagent).
+The other idea it hands you is the **phase boundary**. A phase is a chunk of work inside a session (the [grilling](https://www.aihero.dev/ai-coding-dictionary/grilling), the implementation, the QA), and the boundary between two of them is the only place the question "what do I do with this context?" belongs. Mid-phase, continue the current work, delegate a bounded AFK task, or use an interactive split fork.
 
 | Option | Take it when |
 | --- | --- |
-| **Continue** | The next phase wants this one verbatim, or you have [smart zone](https://www.aihero.dev/ai-coding-dictionary/smart-zone) left. It is the only move that keeps the session as a [primary source](https://www.aihero.dev/ai-coding-dictionary/primary-source), so rule it out first |
-| **`/clear`** | Everything behind you is disposable. Cheapest move on the board, and one-way if you were wrong |
-| **[handoff](https://aihero.dev/skills-handoff)** | Something has to travel: a new [harness](https://www.aihero.dev/ai-coding-dictionary/harness), a new directory, a colleague, a side task forked mid-phase |
-| **Subagent** | The task is scoped tightly enough to run with you [away from the keyboard](https://www.aihero.dev/ai-coding-dictionary/afk) |
-| **`/compact`** | None of the above. The default, and it lands here often |
+| **Continue** | The next phase wants this one verbatim, or you have [smart zone](https://www.aihero.dev/ai-coding-dictionary/smart-zone) left |
+| **`/new`** | Everything behind you is disposable and the next phase needs a fresh Pi session |
+| **[handoff](https://aihero.dev/skills-handoff)** | Context must travel to another harness, directory, or person |
+| **Subagent** | The task is scoped tightly enough to run AFK through `pi-subagents`; a ticket-worker gets a managed worktree, while nested reviewers inherit its cwd with `worktree: false` |
+| **`/split-fork`** | A side task needs its own interactive Pi and live steering |
+| **`/compact`** | Relevant context must remain, but the current window needs room |
 
-Two of those are routinely got wrong, which is why the router carries the order rather than the list. `/handoff` reads like the general bridge between windows and is not: portability is the whole of what it buys. `/compact` is the bottom of the tree rather than the first reach, because the four questions above it are each cheaper or more precise.
+The order matters. `/skill:handoff` buys portability, not routine compression. `/compact` sits at the bottom because the earlier choices are cheaper or more precise.
 
 ## Common questions
 
 **Isn't there just a list of the skills in the right order?**
 
-People keep asking for one in the README. This skill is that list: it is what it exists for. A static table would say `wayfinder → to-spec → to-tickets → implement → code-review` and be wrong for most situations, because the interesting parts are the branches: is there a codebase, does the build span sessions, can this question be settled by talking. The honest cost is that the router is hand-maintained and lags the repo. `/grilling` and `/resolving-merge-conflicts` both shipped long before the router named them.
+People keep asking for one in the README. This skill is that list: it is what it exists for. A static table would say `wayfinder → to-spec → to-tickets → implement → code-review` and be wrong for most situations, because the interesting parts are the branches: is there a codebase, does the build span sessions, can this question be settled by talking. The honest cost is that the router is hand-maintained and lags the repo. `/skill:grilling` and `/skill:resolving-merge-conflicts` both shipped long before the router named them.
 
 **It told me half the skills aren't installed.**
 
-A known bug, unfixed. Most of the skills the router routes you through set `disable-model-invocation: true`, which means the harness leaves them out of the skill list it injects into the agent's context. The agent reads that list as exhaustive and reports them missing. One reported session had it declare the whole spec-and-tickets flow absent and reroute to bare `/grilling` and `/tdd`. Thirteen of the plugin's twenty-two skills carry the flag, so this is the common case rather than an edge. They are installed. Type the slash command anyway, or check `.claude-plugin/plugin.json`, which is the authority on what is present.
+A known bug, unfixed. Most of the skills the router routes you through set `disable-model-invocation: true`, which means the harness leaves them out of the skill list it injects into the agent's context. The agent reads that list as exhaustive and reports them missing. One reported session had it declare the whole spec-and-tickets flow absent and reroute to bare `/skill:grilling` and `/skill:tdd`. Thirteen of the plugin's twenty-two skills carry the flag, so this is the common case rather than an edge. They are installed. Type the slash command anyway, or check `.claude-plugin/plugin.json`, which is the authority on what is present.
 
 **It described a skill's behaviour, and the skill doesn't do that.**
 

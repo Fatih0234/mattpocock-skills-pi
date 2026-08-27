@@ -6,7 +6,7 @@ It is a reference, not a process. There is no loop to run, no artifact it produc
 
 ## When to reach for it
 
-Type `/codebase-design`, or the agent reaches for it automatically when a design task fits.
+Type `/skill:codebase-design`, or the agent reaches for it automatically when a design task fits.
 
 Reach for it when you already know which code you're redesigning and you need to think about its shape: where the seam goes, how small the interface can get, whether an extraction is earning its keep. It is also what you reach for to settle an argument about what a word means.
 
@@ -43,7 +43,7 @@ Depth is deliberately *not* defined as the ratio of implementation lines to inte
 - **The interface is the test surface.** Callers and tests cross the same seam. If you want to test *past* the interface, the module is the wrong shape.
 - **One adapter means a hypothetical seam. Two adapters means a real one.** Don't cut a seam until something actually varies across it. A single-adapter seam is just indirection.
 
-Two supporting files go further, and the skill reads them on demand rather than up front. [DEEPENING.md](https://github.com/mattpocock/skills/blob/main/skills/engineering/codebase-design/DEEPENING.md) classifies a candidate's dependencies into four categories (in-process, local-substitutable, remote-but-owned, true-external), because the category decides how the deepened module gets tested across its seam. [DESIGN-IT-TWICE.md](https://github.com/mattpocock/skills/blob/main/skills/engineering/codebase-design/DESIGN-IT-TWICE.md) spins up parallel [sub-agents](https://www.aihero.dev/ai-coding-dictionary/subagent) to produce three or more radically different interfaces for the same module, then compares them on depth, locality and seam placement.
+Two supporting files go further, and the skill reads them on demand rather than up front. [DEEPENING.md](https://github.com/mattpocock/skills/blob/main/skills/engineering/codebase-design/DEEPENING.md) classifies a candidate's dependencies into four categories (in-process, local-substitutable, remote-but-owned, true-external), because the category decides how the deepened module gets tested across its seam. `DESIGN-IT-TWICE.md` dispatches parallel Pi `interface-designer` agents with different constraints. Each writes one assigned artifact, then the parent compares the designs on depth, locality, leverage, testability, and seam placement.
 
 ## Common questions
 
@@ -53,11 +53,11 @@ This is the most-asked question about the skill and the skill does not answer it
 
 **I pointed a session at it and it burned 100k [tokens](https://www.aihero.dev/ai-coding-dictionary/token) redesigning things I never asked about.**
 
-Known, and filed as [issue #449](https://github.com/mattpocock/skills/issues/449). The skill is model-invoked and describes itself as vocabulary, but nothing in it hard-stops an agent from treating it as a runnable process. Told to "resume in /codebase-design and drive the open decisions", an agent reached for the most action-shaped content it could find: the parallel sub-agents in `DESIGN-IT-TWICE.md`. It re-explored code a previous session had already mapped, and ran a long way before asking anything. None of the guardrails a driver skill has (checkpoints, one question at a time, no auto-advance) are present here, because a reference has none. The workaround is to name a driver skill and let this one sit underneath it: `/grill-with-docs`, `/improve-codebase-architecture` or `/tdd` with `codebase-design` as the vocabulary. The issue is open.
+The skill is model-invoked vocabulary, not a driver. Told to drive an open-ended redesign, an agent may still reach for the action-shaped Design It Twice reference and explore more than requested. Name a driver skill instead: `/skill:grill-with-docs`, `/skill:improve-codebase-architecture`, or `/skill:tdd`, with `codebase-design` underneath as vocabulary.
 
 **Where did `design-an-interface` go? And is there an `/interface-design` skill?**
 
-`design-an-interface` was removed and absorbed into this skill. Nothing was lost: its "design it twice" technique (parallel sub-agents generating radically different designs, from Ousterhout) ships here as `DESIGN-IT-TWICE.md`. Separately, several people have asked for a dedicated `/interface-design` skill for the deep-module/thin-interface philosophy; that philosophy already lives here, and no separate skill is planned. If you came looking for either name, this is the page.
+`design-an-interface` was removed and absorbed into this skill. Its Design It Twice technique now uses parallel Pi `interface-designer` agents with isolated contexts and separate artifacts. The deep-module and thin-interface philosophy remains here rather than in a separate `/interface-design` skill.
 
 **Isn't this a file-structure convention, such as folders, barrel files, feature slices?**
 
@@ -67,9 +67,9 @@ No, and the skill has held that line under repeated pushback. [Issue #95](https:
 
 It does now. For a long time it did not. The inline deep-module notes that used to live inside `tdd` were removed in v1.0 in favour of this shared skill, but the pointer replacing them was never added, so `tdd` defined "seam" for itself and referenced nothing. The gap is closed: the pointer is now in the skill, reached when the shape of the interface is the open question rather than the tests. `tdd` still owns "seam" as the boundary you *test* at; this skill owns the module shape behind it.
 
-**Does the design-it-twice pattern work outside Claude Code?**
+**How does Design It Twice run in Pi?**
 
-Not cleanly. `DESIGN-IT-TWICE.md` says "spawn 3+ sub-agents in parallel using the Agent tool", which is Claude Code's [tool](https://www.aihero.dev/ai-coding-dictionary/tool) by Claude Code's name. The repo ships metadata for other [harnesses](https://www.aihero.dev/ai-coding-dictionary/harness), including Codex, and those may expose nothing under that name, so the parallel-design phase is less portable than the skill's metadata suggests. Tracked in [issue #564](https://github.com/mattpocock/skills/issues/564), open.
+The parent allocates one artifact per proposal and invokes the Pi `subagent` tool with a synchronous `workflowScript` using `await runs.all([...])`. Every child uses the `interface-designer` role with a different design constraint, fresh context, and `worktree: false`. The role's tool allowlist excludes `subagent`, so designers cannot fan out recursively, and each designer is isolated from the other proposals.
 
 **Can I add my own concepts to the glossary, such as connascence, module secrets, [progressive disclosure](https://www.aihero.dev/ai-coding-dictionary/progressive-disclosure)?**
 
@@ -81,7 +81,7 @@ People have proposed exactly those. [Issue #180](https://github.com/mattpocock/s
 - Someone can point at a proposed extraction and say whether it passes the deletion test, without hedging.
 - A proposed seam comes with a second adapter named, not just the first one.
 - Discussion of an interface covers invariants, ordering and error modes, not only the type signature.
-- Invoking it does not start a session. If the agent begins reading files and proposing refactors off the back of `/codebase-design` alone, it has mistaken the reference for a driver.
+- Invoking it does not start a session. If the agent begins reading files and proposing refactors off the back of `/skill:codebase-design` alone, it has mistaken the reference for a driver.
 
 ## Where it fits
 

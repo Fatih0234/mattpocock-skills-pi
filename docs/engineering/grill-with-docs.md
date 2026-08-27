@@ -6,7 +6,7 @@ It is **[stateful](https://www.aihero.dev/ai-coding-dictionary/stateful)**. Ever
 
 ## When to reach for it
 
-You invoke this by typing `/grill-with-docs`; the agent will not reach for it on its own.
+You invoke this by typing `/skill:grill-with-docs`; the agent will not reach for it on its own.
 
 Reach for it at the start of a change, in a repo, when the plan is still fuzzy and the words for the thing are not settled yet. It is the single-session tool. Which grilling skill you want depends on what is in front of you:
 
@@ -18,7 +18,7 @@ Reach for it at the start of a change, in a repo, when the plan is still fuzzy a
 | A repo with no domain docs at all, and no particular feature in mind | `grill-with-docs`, aimed at the repo rather than a change |
 | A decision blocked on knowledge in someone else's head | [to-questionnaire](https://aihero.dev/skills-to-questionnaire) |
 
-The wayfinder split comes down to session count: `/grill-with-docs` for single-session planning, `/wayfinder` for multi-session planning.
+The wayfinder split comes down to session count: `/skill:grill-with-docs` for single-session planning, `/skill:wayfinder` for multi-session planning.
 
 ## Prerequisites
 
@@ -36,13 +36,13 @@ Three things come out of a session, and they are not equal.
 | A decision that is hard to reverse, surprising without context, and a real trade-off | An ADR under `docs/adr/` |
 | Everything else you decided | The conversation, and nowhere else |
 
-That third row is the one that catches people out. `CONTEXT.md` is a glossary and is deliberately kept as one: no implementation details, no [spec](https://www.aihero.dev/ai-coding-dictionary/spec), no scratch notes. ADRs are gated on all three conditions at once, so most decisions do not qualify and most sessions produce none. A session that yields a sharper glossary and zero ADRs is working as designed, but it means the bulk of what you agreed exists only in the [context window](https://www.aihero.dev/ai-coding-dictionary/context-window) you agreed it in. Hand that same conversation to [to-spec](https://aihero.dev/skills-to-spec) rather than [clearing](https://www.aihero.dev/ai-coding-dictionary/clearing) it.
+That third row is the one that catches people out. `CONTEXT.md` is a glossary and is deliberately kept as one: no implementation details, no [spec](https://www.aihero.dev/ai-coding-dictionary/spec), no scratch notes. ADRs are gated on all three conditions at once, so most decisions do not qualify and most sessions produce none. A session that yields a sharper glossary and zero ADRs is working as designed, but it means the bulk of what you agreed exists only in the [context window](https://www.aihero.dev/ai-coding-dictionary/context-window) you agreed it in. Hand that same conversation to [to-spec](https://aihero.dev/skills-to-spec) rather than starting a new Pi session.
 
 The glossary is the point. Domain language is the thing this skill is actually building: the project's own words, agreed once, so you, the agent and your colleagues stop paying to re-derive them. It is worth saying that not everyone agrees this buys you agent performance: the sharpest public pushback is that a term and its plain-English expansion get the same result from the [model](https://www.aihero.dev/ai-coding-dictionary/model), and that the vocabulary really compresses communication between the humans who share it. That reading still leaves the glossary valuable; it just moves the value.
 
 ## Common questions
 
-**Should I use this or `/wayfinder`?**
+**Should I use this or `/skill:wayfinder`?**
 Scope decides it. Use this for anything you can settle in one session; use [wayfinder](https://aihero.dev/skills-wayfinder) when the effort is too big to hold in one, and it charts the work as a map of decision [tickets](https://www.aihero.dev/ai-coding-dictionary/ticket) first. Wayfinder is slower and denser, and reaching for it on a well-scoped feature is the common mistake. It does not replace this skill: it can drop into a grilling session for the parts of the map that suit one.
 
 **It ran, but no `CONTEXT.md` and no ADRs appeared.**

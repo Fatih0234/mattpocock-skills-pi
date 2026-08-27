@@ -1,73 +1,71 @@
 ## What it does
 
-`research` answers a question by reading the sources that own the answer, then leaves a cited Markdown file in the repo. It works only from **[primary sources](https://www.aihero.dev/ai-coding-dictionary/primary-source)**: official docs, source code, specs, first-party APIs. It follows every claim back to the source that owns it, so it will not repeat a blog post's account of an API when the API's own docs are reachable.
+`research` answers a question from the sources that own the answer, then leaves a cited Markdown file in the repo. It works from **[primary sources](https://www.aihero.dev/ai-coding-dictionary/primary-source)**: official documentation, specifications, first-party APIs, and source code.
 
-It does not answer you in the conversation. The output is a file, written where the repo already keeps such notes, with a link on each claim. That is the point: a document you can react to, hand to another agent, or throw away, rather than an answer that vanishes when the [session](https://www.aihero.dev/ai-coding-dictionary/session) ends.
+The reading runs in an isolated headless Pi through the `researcher` role. The parent Pi waits for that delegated run to finish, validates its artifact and citations, then promotes the report from `.scratch/pi-agents/` to the repository's chosen research location. The researcher cannot invoke another subagent because its explicit tool allowlist excludes the `subagent` tool.
+
+Research is legwork you delegate, not judgment you outsource. The report supplies facts for a later decision; it does not make the decision.
 
 ## When to reach for it
 
-Type `/research`, or the [agent](https://www.aihero.dev/ai-coding-dictionary/agent) reaches for it automatically when a task turns into reading legwork.
-
-Reach for it when the next step is *finding something out* from outside the working directory (how a third-party API behaves, what a spec actually says, whether a version claim holds), and you'd rather not stall your own thread doing the reading. What you need decides which skill:
+Type `/skill:research`, or the agent reaches for it automatically when a task turns into substantial reading legwork.
 
 | What you need | Reach for |
 | --- | --- |
 | An external fact a decision is waiting on | `research` |
-| A decision made *with* you, by interview | [grilling](https://aihero.dev/skills-grilling) |
-| A durable architecture decision, written into `CONTEXT.md` and ADRs | [grill-with-docs](https://aihero.dev/skills-grill-with-docs) |
-| To find out whether an approach works in your codebase | [prototype](https://aihero.dev/skills-prototype) |
-| A plan too big to hold in one session | [wayfinder](https://aihero.dev/skills-wayfinder) |
+| A small fact available through a quick local lookup | Let the parent Pi look it up directly |
+| A decision made with you by interview | [grilling](https://aihero.dev/skills-grilling) |
+| A durable architecture decision | [grill-with-docs](https://aihero.dev/skills-grill-with-docs) |
+| Evidence that an approach works in your codebase | [prototype](https://aihero.dev/skills-prototype) |
+| A plan too large for one session | [wayfinder](https://aihero.dev/skills-wayfinder) |
 
-The line between `research` and `grill-with-docs` is the **shelf life of what comes back**. Research produces short-lived assets: what this library's auth mechanism does as of this week. An ADR records a decision you keep. If what you are producing is a decision rather than a fact, you are [grilling](https://www.aihero.dev/ai-coding-dictionary/grilling), not researching.
+The line between research and grilling is whether the blocker is a fact or a decision. A narrow, answerable question produces better research than a broad topic.
 
-## Delegated legwork
+The parent allocates a unique scratch artifact such as:
 
-The defining move is that the reading runs as a **background agent**. You keep working; it goes off, follows each claim to its primary source, writes one Markdown file, and reports back. Research is legwork you delegate, not thinking you outsource: you get a document to grill, plan, or design against, and you still make the call.
+```text
+.scratch/pi-agents/research-20260827-101500/research.md
+```
 
-The delegation is unguarded, and the background agent can spawn a further background agent of its own. This is the skill's best-documented rough edge.
+The researcher writes only that file and returns a short conclusion plus the path. The parent compares `git status --short` before and after delegation, reads the complete report, samples its citations, and chooses the final destination.
 
-Where the file lands is decided by the repo, not by the skill: it matches whatever convention already exists for notes, and if there is none it picks somewhere sensible and tells you where. It writes one file per run.
+`pi-subagents` supports isolated contexts, managed worktrees, and asynchronous jobs. Parallel research belongs in one bounded `subagent` dispatch, as wayfinder does for independent research tickets. Read-only research runs should keep `worktree: false`; managed worktrees are for one owning ticket-worker.
 
 ## Common questions
 
-**It spawned a second research agent. Is that meant to happen?**
+**Why does the researcher write to scratch first?**
 
-No. This is an open bug, [issue #530](https://github.com/mattpocock/skills/issues/530). The skill tells its caller to spin up a background agent but does not restrict the agent type, so the agent it spawns is a `general-purpose` one that holds the `Agent` tool and the same instructions, and fires them again. One reporter measured a single research task costing roughly 450k [tokens](https://www.aihero.dev/ai-coding-dictionary/token) across three overlapping runs, with the duplicate finishing half an hour later entirely out of view. It reproduces outside Claude Code too; the same nesting was confirmed in Codex with GPT-5.6-sol. There is no shipped fix. Users have patched their own installed copy with a line telling an agent that is already a [subagent](https://www.aihero.dev/ai-coding-dictionary/subagent) to do the work itself, which helps but is instruction-level, not structural. Watch your background task list after invoking, and stop the duplicate.
+Scratch space creates a validation gate. The parent can reject weak citations, correct the destination, or discard stale research before it becomes normal project documentation. Existing documentation is never replaced by an unreviewed child process.
 
-The opposite failure exists as well: if your own global instructions forbid an agent from re-delegating work, the background agent will politely decline the task and the skill quietly does nothing.
+**Can the researcher modify source code or Git state?**
 
-**Where should the file live, and should I commit it?**
+No. Its role permits one assigned report artifact. Project files, Git state, and tracker state remain read-only. The parent verifies the working tree after every dispatch.
 
-The skill puts the file where the repo already keeps notes and does not have an opinion beyond that. The community one is fairly settled: ADRs are kept, research files are not. The sharpest version of it, from a Discord thread on exactly this question: "ADRs yes. Everything else archive or delete after done. It otherwise becomes cruft of work and can poison future repo reads if you've drifted away from the spec/research." A research file records what was true on the day it was written, so a stale one is worse than none. On balance these artifacts don't really belong in git, and there is no canonical home for them: people use Obsidian, a separate knowledge repo, or the issue tracker instead.
+**What counts as a primary source?**
 
-**What counts as a "high-trust" primary source, and who decides?**
+Use the source that owns the claim: official documentation for a public API, the specification for protocol behavior, first-party source for implementation behavior, and first-party release notes for version changes. A secondary article can point toward evidence, but it cannot be the final citation for a material claim.
 
-The [model](https://www.aihero.dev/ai-coding-dictionary/model) does. The skill names the *kinds* of source that qualify (official docs, source code, specs, first-party APIs), and there is no allowlist, no domain gate, and no verification pass. This was the loudest objection when the skill was first proposed and it has never been answered publicly: "Five research subagents pointed at junk just gives you five confident wrong answers faster. How are you gating what counts as high-trust sources?" The mitigation you actually have is the citation on each claim. Follow two or three of them. If they land on a summary of the thing rather than the thing, the run failed at its one job.
+**Does a later session automatically reuse the report?**
 
-**Does a later session reuse what an earlier run found?**
+No. The report becomes context only when a human, ticket, spec, or skill points to it. Link useful reports from the decision or implementation artifact they inform. Remove research that has become stale and has no durable consumer.
 
-No. Nothing auto-loads a past research file; it is a document sitting in the repo until a human or a skill points at it. This was raised early as the strongest challenge to the design: "the value's the markdown becoming context the agent re-reads later, not the fetch itself. A write-once dead file is just a fancy search." The shipped skill does not solve it. In practice the file earns its keep by being fed into the next step deliberately: attach it to a spec, quote it into a grilling session, point a [ticket](https://www.aihero.dev/ai-coding-dictionary/ticket) at it.
+**How does wayfinder use this?**
 
-**Why not just ask the agent to go read the docs?**
+Wayfinder groups independent research tickets into one parallel Pi subagent dispatch. Each `researcher` gets a unique artifact. The parent then validates the reports, posts the resolutions, closes the tickets, and updates the map. Researchers do not mutate tracker or Git state.
 
-You can, and a two-line prompt saying exactly that was the practice this skill replaced. Two things the skill buys over the prompt: it runs in the background so your session keeps its [context](https://www.aihero.dev/ai-coding-dictionary/context) clean, and the primary-source constraint and the cited-file output come out the same way every time rather than however you happened to phrase it. Against a [harness](https://www.aihero.dev/ai-coding-dictionary/harness)'s own deep-research mode, the difference is the artifact and the source discipline, not the search. If a two-line prompt gets you what you need on a small question, use the two-line prompt.
+**What happens if the subagent tool is unavailable?**
 
-**When does it stop reading?**
-
-There is no stopping criterion in the skill, and this shows up as two complaints that look opposite but are the same gap: agents that go far too deep, and agents that cover a topic broadly while missing the one specific detail that mattered. One practitioner put it as "deep-research skills are a bit too deep sometimes. And telling an agent to research usually results in missing crucial details." Scoping is on you. A narrow, answerable question (one API, one behaviour, one version claim) comes back far better than "research X".
-
-**`/wayfinder` created research tickets. Do I resolve those myself?**
-
-No, it now fires them for you. In the unreleased changes since v1.1, a charting session spawns a `/research` subagent per research ticket and burns them down in parallel, capturing findings on a throwaway `research/<name>` branch with a [context pointer](https://www.aihero.dev/ai-coding-dictionary/context-pointer) from the ticket. Research tickets are the one exception to wayfinder's one-ticket-per-session rule, because they are [AFK](https://www.aihero.dev/ai-coding-dictionary/afk): nothing waits on you. Two known snags with those branches: the subagent has been seen opening a draft PR from a branch that is never meant to merge ([issue #576](https://github.com/mattpocock/skills/issues/576)), and deleting the branch later breaks the context pointers the tickets hold.
+The parent performs the same primary-source research in the current session and writes the report directly. It states that the work was not context-isolated.
 
 ## It's working if
 
-- Your own session keeps going. If you are sitting watching it read, the delegation didn't happen.
-- Exactly one new background task appears. A second one with a near-identical name is the nesting bug.
-- One new Markdown file shows up, in the folder the repo already uses for notes, and the agent tells you the path.
-- Every claim in it carries a link, and following two at random lands you on an official doc, a spec, or the actual source file, not on someone's write-up of it.
-- You can make the decision you were stuck on from the file alone, without going back to the sources yourself.
+- Exactly one `researcher` runs for a single research question.
+- The only child-authored filesystem change is the assigned scratch artifact.
+- Every material factual claim has a primary-source citation.
+- The report distinguishes sourced fact, inference, and uncertainty.
+- The parent validates the report before promoting it.
+- The report alone is enough to make or sharpen the decision that requested it.
 
 ## Where it fits
 
-A reach-for-it-anytime standalone that feeds the thinking skills rather than sitting in the build chain. Its file is something to take *into* the flow: [grilling](https://aihero.dev/skills-grilling) and [grill-with-docs](https://aihero.dev/skills-grill-with-docs) ask sharper questions when the facts are already on the table, and [to-spec](https://aihero.dev/skills-to-spec) can synthesise against it. [wayfinder](https://aihero.dev/skills-wayfinder) is the one skill that invokes it directly, resolving each research ticket on its map with a `/research` subagent. For the whole map, see [ask-matt](https://aihero.dev/skills-ask-matt).
+Research is a standalone input to the thinking flows. [grilling](https://aihero.dev/skills-grilling) and [grill-with-docs](https://aihero.dev/skills-grill-with-docs) ask sharper questions when the facts are already available, and [to-spec](https://aihero.dev/skills-to-spec) can synthesize against the report. [wayfinder](https://aihero.dev/skills-wayfinder) invokes the same `researcher` role for AFK research tickets. [ask-matt](https://aihero.dev/skills-ask-matt) routes over the full set.

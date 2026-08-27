@@ -6,7 +6,7 @@ It does not teach from what the [model](https://www.aihero.dev/ai-coding-diction
 
 ## When to reach for it
 
-You invoke this by typing `/teach`; the [agent](https://www.aihero.dev/ai-coding-dictionary/agent) won't reach for it on its own.
+You invoke this by typing `/skill:teach`; the [agent](https://www.aihero.dev/ai-coding-dictionary/agent) won't reach for it on its own.
 
 Reach for it when the learning is the project: a language, a framework, a codebase you have just joined, yoga, shaders, a certification. It is not the tool for one explanation in passing.
 
@@ -16,7 +16,7 @@ Reach for it when the learning is the project: a language, a framework, a codeba
 | One idea explained inside the session you are already in | Just ask, in that session |
 | The agent's last message re-pitched because it didn't land | [wait-what](https://aihero.dev/skills-wait-what) |
 | To sharpen thinking you already have, rather than acquire new material | [grill-me](https://aihero.dev/skills-grill-me) |
-| A background agent to read [primary sources](https://www.aihero.dev/ai-coding-dictionary/primary-source) and leave you a cited document | [research](https://aihero.dev/skills-research) |
+| An isolated Pi researcher to read [primary sources](https://www.aihero.dev/ai-coding-dictionary/primary-source) and leave a cited artifact | [research](https://aihero.dev/skills-research) |
 | To learn something that came up mid-grilling, without derailing the [grilling](https://www.aihero.dev/ai-coding-dictionary/grilling) | [handoff](https://aihero.dev/skills-handoff) out to a teaching workspace, then `teach` there |
 
 ## Prerequisites
@@ -59,7 +59,7 @@ Lessons are built from **components** in `assets/`: stylesheets, quiz widgets, s
 A real, open bug ([#377](https://github.com/mattpocock/skills/issues/377)). `SKILL.md` uses `./` for two different roots at once: `./MISSION-FORMAT.md` and its siblings really do sit next to `SKILL.md` in the installed skill, while `./lessons/`, `./reference/`, `./learning-records/` and `./assets/` are meant to be in your directory. An agent that resolves the first kind against the skill's install directory goes on to resolve the second kind there too, and writes your course into the skill folder. Check where the first lesson landed before you build on it, and name the directory explicitly when you start rather than relying on "the current directory" being understood.
 
 **Do I stay in one session, or start a new one per lesson?**
-All three approaches work: staying in the same session, re-invoking `/teach` in a new session, or opening a new session in the same folder. Each lesson is its own invocation. The folder is the continuity, not the conversation. Common practice is to open a fresh session in the workspace and say `/teach next lesson for <topic>`.
+All three approaches work: staying in the same session, re-invoking `/skill:teach` in a new session, or opening a new session in the same folder. Each lesson is its own invocation. The folder is the continuity, not the conversation. Common practice is to open a fresh session in the workspace and say `/skill:teach next lesson for <topic>`.
 
 **How do I know it isn't teaching me something it made up?**
 You don't, on the skill's word alone. You read the primary sources. `teach` is not reliable enough to trust unchecked, and no skill built on an LLM is. The grounding machinery (`RESOURCES.md`, citations in every lesson, one recommended primary source per lesson) exists to make verification cheap, not to remove the need for it. The failure is not hypothetical: one user learning a 2x2 Rubik's cube was given fabricated move sequences that don't solve it. The diagnostic checklist for a case like that is model, harness, effort, and what the source was. Risk is highest in procedural domains with precise notation, and lowest where the output is immediately verifiable, like code you can run.
@@ -94,4 +94,4 @@ There is no canonical answer, and the reported differences are large. Higher [re
 
 `teach` is a **reach-for-it-anytime standalone**. It is not a step in a build chain and shares no artifacts with the engineering flow; it owns its directory and lives there for as long as the topic lasts.
 
-Its one real neighbour is [handoff](https://aihero.dev/skills-handoff), through the composition Matt named as the answer to "what do I do if I'm being grilled about something I don't understand?": don't stop the grilling to learn: `/handoff` to a teaching workspace, learn it there with `/teach`, then go back and pick up where you left off. The nearby alternative is [research](https://aihero.dev/skills-research), for when what you want is a cited document rather than lessons and retention. When you are not sure which skill or flow fits, [ask-matt](https://aihero.dev/skills-ask-matt) routes you over the whole set.
+Its one real neighbour is [handoff](https://aihero.dev/skills-handoff), through the composition Matt named as the answer to "what do I do if I'm being grilled about something I don't understand?": don't stop the grilling to learn: `/skill:handoff` to a teaching workspace, learn it there with `/skill:teach`, then go back and pick up where you left off. The nearby alternative is [research](https://aihero.dev/skills-research), for when what you want is a cited document rather than lessons and retention. When you are not sure which skill or flow fits, [ask-matt](https://aihero.dev/skills-ask-matt) routes you over the whole set.

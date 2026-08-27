@@ -6,7 +6,7 @@ It does not interview you. By the time you reach for it the deciding is already 
 
 ## When to reach for it
 
-You invoke this by typing `/to-spec`; the [agent](https://www.aihero.dev/ai-coding-dictionary/agent) won't reach for it on its own.
+You invoke this by typing `/skill:to-spec`; the [agent](https://www.aihero.dev/ai-coding-dictionary/agent) won't reach for it on its own.
 
 Reach for it when the build is too big for one agent [session](https://www.aihero.dev/ai-coding-dictionary/session) and has to survive being split across several. That is the whole trigger:
 
@@ -14,8 +14,8 @@ Reach for it when the build is too big for one agent [session](https://www.aiher
 | --- | --- |
 | You haven't decided anything yet | [grill-with-docs](https://aihero.dev/skills-grill-with-docs) first |
 | Decided, and the work fits one [context window](https://www.aihero.dev/ai-coding-dictionary/context-window) | [implement](https://aihero.dev/skills-implement): skip the spec |
-| Decided, and the work spans several sessions | `/to-spec`, then [to-tickets](https://aihero.dev/skills-to-tickets) |
-| A [wayfinder](https://aihero.dev/skills-wayfinder) map has cleared | `/to-spec #<map_issue>` |
+| Decided, and the work spans several sessions | `/skill:to-spec`, then [to-tickets](https://aihero.dev/skills-to-tickets) |
+| A [wayfinder](https://aihero.dev/skills-wayfinder) map has cleared | `/skill:to-spec #<map_issue>` |
 
 ## Prerequisites
 
@@ -39,13 +39,13 @@ Those agreed seams then travel. [tdd](https://aihero.dev/skills-tdd) works only 
 It is this skill, renamed in v1.1. "Spec" is now the single through-line term, and the old `to-prd` slug is dead; reinstall under the new name. The pair that replaced the old vocabulary is *spec* and *tickets*: the spec is the destination and the decisions that fix it, the [tickets](https://www.aihero.dev/ai-coding-dictionary/ticket) are the execution steps that get there. If you pivot, delete the unfinished tickets and keep the spec.
 
 **Why does the spec get the `ready-for-agent` label? I don't want an agent implementing off it.**
-The label means "no further triage needed": the document is complete enough for an agent to work from. It is an input designation, not a work order. But if you run [AFK](https://www.aihero.dev/ai-coding-dictionary/afk) agents that poll for `ready-for-agent`, that distinction isn't visible to them, and they will happily try to build the whole spec in one run instead of picking up the ticket slices. This is the most-reported rough edge on the skill. Until it changes, exclude the parent spec explicitly in your AFK agent's prompt, or strip the label once `/to-tickets` has run.
+The label means "no further triage needed": the document is complete enough for an agent to work from. It is an input designation, not a work order. But if you run [AFK](https://www.aihero.dev/ai-coding-dictionary/afk) agents that poll for `ready-for-agent`, that distinction isn't visible to them, and they will happily try to build the whole spec in one run instead of picking up the ticket slices. This is the most-reported rough edge on the skill. Until it changes, exclude the parent spec explicitly in your AFK agent's prompt, or strip the label once `/skill:to-tickets` has run.
 
-**Why not go straight from grilling to `/to-tickets` and skip the spec?**
-Often you should; the spec earns its step only on multi-session work. Where it pays is that the tickets are disposable and the spec isn't: each ticket is sized for one fresh context window and gets deleted or closed, while the spec stays as the one place the reasoning behind them lives. On a single-session change that buys you nothing, and you have paid an extra synthesis step where the [model](https://www.aihero.dev/ai-coding-dictionary/model) can drift. Go grilling → `/implement`.
+**Why not go straight from grilling to `/skill:to-tickets` and skip the spec?**
+Often you should; the spec earns its step only on multi-session work. Where it pays is that the tickets are disposable and the spec isn't: each ticket is sized for one fresh context window and gets deleted or closed, while the spec stays as the one place the reasoning behind them lives. On a single-session change that buys you nothing, and you have paid an extra synthesis step where the [model](https://www.aihero.dev/ai-coding-dictionary/model) can drift. Go grilling → `/skill:implement`.
 
 **I just finished a wayfinder map. What do I feed it?**
-The main map issue: `/to-spec #<map_issue>`, not the individual decision tickets. [wayfinder](https://aihero.dev/skills-wayfinder) produces decisions rather than deliverables, scattered across a map; `to-spec` is the step that collapses them into one buildable document. Looping the map straight into `/implement` throws that collapse away.
+The main map issue: `/skill:to-spec #<map_issue>`, not the individual decision tickets. [wayfinder](https://aihero.dev/skills-wayfinder) produces decisions rather than deliverables, scattered across a map; `to-spec` is the step that collapses them into one buildable document. Looping the map straight into `/skill:implement` throws that collapse away.
 
 **Is the spec for me to review, or is it just for the agent?**
 Mostly for the agent, and it reads that way: complete, dense, reference-heavy. The parts worth your eyes are the seams and the out-of-scope section, because those are the two places a wrong decision is cheapest to catch and most expensive to discover later. Reading the whole thing end to end is a real complaint people have, and there is no summary mode: the honest answer is that if the spec surprises you, the grilling was too shallow, not the spec too long.
@@ -59,8 +59,8 @@ Less well, and this is a known limitation. The template leans hard on user stori
 **Will it check the tracker for related work, or cite the ADRs it's respecting?**
 No to both. It reads and respects the ADRs covering the area it touches, but it doesn't link them, and it doesn't search the tracker for overlapping issues before drafting, so a spec can quietly duplicate work someone already filed. Search the tracker yourself first if the area is busy.
 
-**`/to-tickets` couldn't read my spec: it kept truncating.**
-Very large specs can outgrow what a tracker issue will serve back cleanly, and there is no local copy to fall back on. The fix is context hygiene: don't [clear](https://www.aihero.dev/ai-coding-dictionary/clearing) or [compact](https://www.aihero.dev/ai-coding-dictionary/compaction) between `/to-spec` and `/to-tickets`. Run them in the same window and the spec never has to be re-fetched at all.
+**`/skill:to-tickets` couldn't read my spec: it kept truncating.**
+Very large specs can outgrow what a tracker issue will serve back cleanly, and there is no local copy to fall back on. The fix is context hygiene: do not start a new Pi session or [compact](https://www.aihero.dev/ai-coding-dictionary/compaction) between `/skill:to-spec` and `/skill:to-tickets`. Run them in the same window and the spec never has to be re-fetched at all.
 
 ## It's working if
 

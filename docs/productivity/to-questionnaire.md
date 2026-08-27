@@ -6,7 +6,7 @@ It grills you about the **send**, never the subject. Interviewing you about the 
 
 ## When to reach for it
 
-You invoke this by typing `/to-questionnaire`; the [agent](https://www.aihero.dev/ai-coding-dictionary/agent) won't reach for it on its own.
+You invoke this by typing `/skill:to-questionnaire`; the [agent](https://www.aihero.dev/ai-coding-dictionary/agent) won't reach for it on its own.
 
 Reach for it when a decision is blocked on knowledge that lives in one other person's head: a client, a domain expert, an exec who owns the business rules, a colleague on a team you don't sit with. Which skill you want depends on where the answers actually are:
 
@@ -17,7 +17,7 @@ Reach for it when a decision is blocked on knowledge that lives in one other per
 | Someone else's head | `to-questionnaire` |
 | Nobody's head yet, the question needs something to react to | [prototype](https://aihero.dev/skills-prototype) |
 
-The common case is a [grilling](https://www.aihero.dev/ai-coding-dictionary/grilling) session that stalls: some of what surfaced isn't yours to answer. Run `/to-questionnaire` in that same conversation to take those questions offline, then bring the answers back and carry on.
+The common case is a [grilling](https://www.aihero.dev/ai-coding-dictionary/grilling) session that stalls: some of what surfaced isn't yours to answer. Run `/skill:to-questionnaire` in that same conversation to take those questions offline, then bring the answers back and carry on.
 
 ## The send, not the subject
 
@@ -57,7 +57,7 @@ The document tells them to say so. "I don't know" and partial answers are asked 
 **Does it send it anywhere (Slack, an issue tracker, email)?**
 No. It writes a Markdown file in the current directory and tells you the path. Delivery is yours: paste it into a [ticket](https://www.aihero.dev/ai-coding-dictionary/ticket), drop it in a Slack thread, attach it to an email, or open it on a shared screen and work through it live. People have wired up all four by hand.
 
-**Isn't this just `/grill-me` in batch mode?**
+**Isn't this just `/skill:grill-me` in batch mode?**
 No, and the distinction is worth holding. `grill-me` already asks in **rounds**: the whole frontier at once, then recomputed from your answers, so the "give me all the questions at once" need is met there. `to-questionnaire` is about a different axis: not how the questions are delivered, but whose head the answers are in. Answering them yourself faster is `grill-me`; getting them out of someone else is this.
 
 **Couldn't I just ask the agent for this without a skill?**
