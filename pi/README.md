@@ -58,16 +58,25 @@ Matt skills remain the engineering workflow, not a competing runtime. Humans con
 
 ## Reproducible source model
 
-The clean `mattpocock-skills-upstream` worktree remains on upstream `main`. Pi-specific changes stay on the sibling `pi-integration` worktree. The dotfiles installer applies the versioned integration patches, checks the expected tree, and then runs this installer. Export changes only after validation and commit:
+This adapter repository is the durable Pi-specific layer. Its `main` branch follows
+Matt's upstream base, while `pi-integration` contains the adapted skills, roles,
+installer, and tests. Keep `origin` pointed at
+`https://github.com/Fatih0234/mattpocock-skills-pi.git` and `upstream` pointed at
+`https://github.com/mattpocock/skills.git`.
+
+Validate changes before pushing the adapter branch:
 
 ```bash
 ./pi/validate.py
 ./pi/smoke.sh              # deterministic installer/replacement checks
 ./pi/smoke.sh --runtime    # authenticated end-to-end worker/worktree canaries
-
-# From the wsl-dotfiles checkout, after this worktree is committed:
-MATPOCOCK_SKILLS_PI_WORKTREE="$PWD" \
-  /path/to/wsl-dotfiles/scripts/export-mattpocock-pi.sh
 ```
 
-The dotfiles snapshot exporter allowlists integration source and documentation paths and rejects credentials, sessions, model stores, and scratch artifacts.
+`wsl-dotfiles` pins a specific adapter commit and runs this repository's installer;
+it does not vendor the source or apply generated patches. After committing a tested
+adapter change, refresh the dotfiles pin:
+
+```bash
+# From the wsl-dotfiles checkout:
+./scripts/export-mattpocock-pi.sh
+```
