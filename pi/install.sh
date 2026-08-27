@@ -94,13 +94,6 @@ restore_transaction() {
 }
 trap restore_transaction EXIT
 
-mkdir -p "$AGENTS_DEST" "$EXTENSIONS_DEST" "$(dirname "$SETTINGS")" "$NATIVE_SKILLS_ROOT"
-# Journal settings before creating a missing file. A failed first install must
-# restore the absence, not leave behind a partial empty settings object.
-record_target "$SETTINGS"
-if [ ! -f "$SETTINGS" ]; then
-  printf '{}\n' > "$SETTINGS"
-fi
 if [ ! -f "$SUBAGENTS_CONFIG_SOURCE" ]; then
   echo "error: missing pi-subagents configuration: $SUBAGENTS_CONFIG_SOURCE" >&2
   exit 1
@@ -114,7 +107,8 @@ import sys
 source = json.loads(Path(sys.argv[1]).read_text())
 if not isinstance(source, dict):
     raise SystemExit("error: pi-subagents config must be an object")
-settings = json.loads(Path(sys.argv[2]).read_text())
+settings_path = Path(sys.argv[2])
+settings = json.loads(settings_path.read_text()) if settings_path.is_file() else {}
 if not isinstance(settings, dict):
     raise SystemExit("error: settings.json must be an object")
 for key in ("packages", "skills"):
@@ -127,20 +121,35 @@ PY
 # silently replaced. The old integration runtime is the only removable target.
 legacy_runtime="$EXTENSIONS_DEST/subagent"
 managed_legacy=false
+managed_marker="$legacy_runtime/.matt-skills-pi-managed"
 if exists "$legacy_runtime"; then
   managed_legacy=false
   if [ -L "$legacy_runtime" ]; then
     legacy_source="$(readlink "$legacy_runtime")"
-    case "$legacy_source" in
-      "$ROOT/pi/extensions/subagent"|*/pi/extensions/subagent) managed_legacy=true ;;
-    esac
-  elif [ -d "$legacy_runtime" ] && [ -f "$legacy_runtime/index.ts" ] && [ -f "$legacy_runtime/UPSTREAM-SOURCE.txt" ]; then
+    if [ "$legacy_source" = "$ROOT/pi/extensions/subagent" ]; then
+      managed_legacy=true
+    fi
+  elif [ -d "$legacy_runtime" ] && [ -f "$legacy_runtime/index.ts" ] && [ -f "$legacy_runtime/UPSTREAM-SOURCE.txt" ] && [ "$(cat "$legacy_runtime/UPSTREAM-SOURCE.txt")" = "managed by the previous installer" ]; then
+    managed_legacy=true
+  elif [ -f "$managed_marker" ] && [ "$(cat "$managed_marker")" = "matt-skills-pi managed runtime" ]; then
+    # A completed install records ownership outside config.json. A config file
+    # alone never establishes that this extension belongs to this integration.
     managed_legacy=true
   fi
-  if ! $managed_legacy && [ ! -f "$legacy_runtime/config.json" ]; then
+  if ! $managed_legacy; then
     echo "error: refusing to replace unrelated extension: $legacy_runtime" >&2
     exit 1
   fi
+fi
+
+# The occupant preflight above must be complete before creating any installation
+# state. From here on, every mutation is journaled for rollback.
+mkdir -p "$AGENTS_DEST" "$EXTENSIONS_DEST" "$(dirname "$SETTINGS")" "$NATIVE_SKILLS_ROOT"
+# Journal settings before creating a missing file. A failed first install must
+# restore the absence, not leave behind a partial empty settings object.
+record_target "$SETTINGS"
+if [ ! -f "$SETTINGS" ]; then
+  printf '{}\n' > "$SETTINGS"
 fi
 
 # Keep a copy of the package-manager state until the handover commits. npm may
@@ -224,7 +233,10 @@ if not settings["skills"]:
 packages = settings.get("packages", [])
 if not isinstance(packages, list) or not all(isinstance(item, str) for item in packages):
     raise SystemExit("error: settings.json 'packages' must be an array of strings")
-packages = [item for item in packages if "pi-subagents" not in item]
+packages = [
+    item for item in packages
+    if item != "npm:pi-subagents" and not item.startswith("npm:pi-subagents@")
+]
 packages.append(package)
 settings["packages"] = list(dict.fromkeys(packages))
 settings["enableSkillCommands"] = True
@@ -235,11 +247,17 @@ PY
 # the transaction trap until both runtime config and settings are live.
 if $managed_legacy; then
   replace_target "$legacy_runtime"
+else
+  # The preflight above established that this target is absent.
+  record_target "$legacy_runtime"
 fi
 mkdir -p "$legacy_runtime"
 config_target="$legacy_runtime/config.json"
 record_target "$config_target"
 cp "$config_stage" "$config_target"
+marker_target="$legacy_runtime/.matt-skills-pi-managed"
+record_target "$marker_target"
+printf 'matt-skills-pi managed runtime\n' > "$marker_target"
 cp "$settings_stage" "$SETTINGS"
 inject_failure after-runtime-handover
 inject_failure after-settings

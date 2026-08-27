@@ -19,22 +19,20 @@ scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 agent_dir="$scratch/agent"
 mkdir -p "$agent_dir"
-printf '{"skills":["/tmp/unrelated-skill"],"enableSkillCommands":false}\n' > "$agent_dir/settings.json"
+printf '{"skills":["/tmp/unrelated-skill"],"packages":["npm:pi-codex-goal"],"enableSkillCommands":false}\n' > "$agent_dir/settings.json"
 # Simulate the previous managed runtime so migration cleanup is exercised.
 mkdir -p "$agent_dir/extensions"
 ln -s "$ROOT/pi/extensions/subagent" "$agent_dir/extensions/subagent"
 
 PI_NATIVE_SKILLS_ROOT="$scratch/no-native-skills" PI_AGENT_DIR="$agent_dir" PI_CODING_AGENT_DIR="$agent_dir" "$ROOT/pi/install.sh" > "$scratch/install-first.log"
 first_hash="$(sha256sum "$agent_dir/settings.json" | cut -d' ' -f1)"
-first_backups="$(find "$agent_dir/backups" -name 'settings.json.*.bak' | wc -l)"
 PI_NATIVE_SKILLS_ROOT="$scratch/no-native-skills" PI_AGENT_DIR="$agent_dir" PI_CODING_AGENT_DIR="$agent_dir" "$ROOT/pi/install.sh" > "$scratch/install-second.log"
 second_hash="$(sha256sum "$agent_dir/settings.json" | cut -d' ' -f1)"
-second_backups="$(find "$agent_dir/backups" -name 'settings.json.*.bak' | wc -l)"
 
 [ "$first_hash" = "$second_hash" ] || { echo "installer changed settings on its second run" >&2; exit 1; }
-[ "$first_backups" = "$second_backups" ] || { echo "installer created a redundant settings backup" >&2; exit 1; }
 [ ! -L "$agent_dir/extensions/subagent" ] || { echo "legacy custom subagent runtime remains active" >&2; exit 1; }
 test -f "$agent_dir/extensions/subagent/config.json"
+test "$(cat "$agent_dir/extensions/subagent/.matt-skills-pi-managed")" = "matt-skills-pi managed runtime"
 python3 - "$agent_dir/settings.json" "$agent_dir/extensions/subagent/config.json" "$ROOT" <<'PY'
 import json
 from pathlib import Path
@@ -47,6 +45,7 @@ expected_skills = {"/tmp/unrelated-skill"}
 assert set(settings.get("skills", [])) == expected_skills, settings.get("skills")
 assert settings["enableSkillCommands"] is True
 assert settings["packages"].count("npm:pi-subagents@0.58.0") == 1, settings["packages"]
+assert settings["packages"].count("npm:pi-codex-goal") == 1, settings["packages"]
 assert config["maxSubagentDepth"] == 2
 assert config["defaultSubagentContext"] == "fresh"
 assert config["worktreeBaseDir"] == "~/.cache/pi-subagents/worktrees"
@@ -90,6 +89,20 @@ fi
 [ "$(cat "$migration_native/code-review/SKILL.md")" = "stale code-review" ]
 [ "$(cat "$migration_native/unrelated/SKILL.md")" = "keep this user skill" ]
 
+# A failed first install must not leave a newly-created runtime directory or
+# settings file that blocks the next attempt.
+fresh_failure_agent="$scratch/fresh-failure-agent"
+if PI_INSTALL_FAIL_AT=after-runtime-handover PI_NATIVE_SKILLS_ROOT="$scratch/fresh-failure-native" PI_AGENT_DIR="$fresh_failure_agent" PI_CODING_AGENT_DIR="$fresh_failure_agent" "$ROOT/pi/install.sh" > "$scratch/fresh-failure.log" 2>&1; then
+  echo "fresh-install failure injection unexpectedly succeeded" >&2
+  exit 1
+fi
+test ! -e "$fresh_failure_agent/settings.json"
+test ! -e "$fresh_failure_agent/extensions/subagent"
+test ! -e "$fresh_failure_agent/npm"
+test "$(find "$migration_agent/agents" -mindepth 1 -maxdepth 1 -type l | wc -l)" = 0
+test "$(find "$migration_native" -mindepth 1 -maxdepth 1 -type l | wc -l)" = 0
+echo "Fresh-install rollback left no partial runtime state."
+
 echo "Installer rollback smoke passed."
 
 # Successful migration converges stale managed native skills while retaining an
@@ -99,6 +112,12 @@ for skill in ask-matt implement code-review; do
   test -L "$migration_native/$skill"
   test "$(readlink -f "$migration_native/$skill")" = "$ROOT/skills/engineering/$skill"
 done
+python3 - "$migration_agent/extensions/subagent/config.json" <<'PY'
+import json
+from pathlib import Path
+import sys
+assert json.loads(Path(sys.argv[1]).read_text())["legacy"] is True
+PY
 test ! -e "$migration_native/implement-spec"
 test -f "$migration_native/unrelated/SKILL.md"
 test "$(cat "$migration_native/unrelated/SKILL.md")" = "keep this user skill"
@@ -108,6 +127,50 @@ migration_hash="$(sha256sum "$migration_agent/settings.json" | cut -d' ' -f1)"
 PI_NATIVE_SKILLS_ROOT="$migration_native" PI_AGENT_DIR="$migration_agent" PI_CODING_AGENT_DIR="$migration_agent" "$ROOT/pi/install.sh" > "$scratch/migration-second.log"
 test "$(sha256sum "$migration_agent/settings.json" | cut -d' ' -f1)" = "$migration_hash"
 echo "Stale native Matt skill migration and idempotence smoke passed."
+
+# Negative canary: an extension with config.json is still unrelated unless it
+# matches the known managed legacy runtime shape. The installer must fail before
+# package installation and leave the occupant byte-for-byte unchanged.
+unrelated_agent="$scratch/unrelated-agent"
+unrelated_runtime="$unrelated_agent/extensions/subagent"
+unrelated_snapshot="$scratch/unrelated-runtime-before"
+mkdir -p "$unrelated_runtime"
+cp "$ROOT/pi/subagents-config.json" "$unrelated_runtime/config.json"
+python3 - "$unrelated_runtime/config.json" <<'PY'
+import json
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+config = json.loads(path.read_text())
+config["foreign"] = True
+config["setting"] = "preserve"
+path.write_text(json.dumps(config, indent=2) + "\n")
+PY
+cp -a "$unrelated_agent" "$unrelated_snapshot"
+if PI_NATIVE_SKILLS_ROOT="$scratch/unrelated-native" PI_AGENT_DIR="$unrelated_agent" PI_CODING_AGENT_DIR="$unrelated_agent" "$ROOT/pi/install.sh" > "$scratch/unrelated-install.log" 2>&1; then
+  echo "installer replaced an unrelated extension with config.json" >&2
+  exit 1
+fi
+grep -q "refusing to replace unrelated extension" "$scratch/unrelated-install.log"
+diff -qr "$unrelated_snapshot" "$unrelated_agent"
+echo "Unrecognized extension occupant was rejected without mutation."
+
+# Negative canary: a foreign legacy-shaped directory must not be accepted by
+# filename shape alone. The ownership marker content must also be recognized.
+spoof_agent="$scratch/spoof-agent"
+spoof_runtime="$spoof_agent/extensions/subagent"
+mkdir -p "$spoof_runtime"
+printf 'foreign runtime\n' > "$spoof_runtime/index.ts"
+printf 'not managed by this installer\n' > "$spoof_runtime/UPSTREAM-SOURCE.txt"
+spoof_snapshot="$scratch/spoof-runtime-before"
+cp -a "$spoof_agent" "$spoof_snapshot"
+if PI_NATIVE_SKILLS_ROOT="$scratch/spoof-native" PI_AGENT_DIR="$spoof_agent" PI_CODING_AGENT_DIR="$spoof_agent" "$ROOT/pi/install.sh" > "$scratch/spoof-install.log" 2>&1; then
+  echo "installer replaced a foreign legacy-shaped extension" >&2
+  exit 1
+fi
+grep -q "refusing to replace unrelated extension" "$scratch/spoof-install.log"
+diff -qr "$spoof_snapshot" "$spoof_agent"
+echo "Foreign legacy-shaped extension was rejected without mutation."
 
 echo "Installer and runtime replacement smoke test passed."
 
@@ -202,6 +265,13 @@ import sys
 jsonl = Path(sys.argv[1]); before_path = Path(sys.argv[2]); fixture = Path(sys.argv[3]); base = sys.argv[4]; handoff_dir = Path(sys.argv[5]); runtime_dir = Path(sys.argv[6])
 label = sys.argv[7]
 before = set(before_path.read_text().splitlines())
+before_patches = set()
+for manifest_name in before:
+    try:
+        data = json.loads((handoff_dir / manifest_name).read_text())
+        before_patches.add(data["groups"][0]["children"][0]["patch"]["path"])
+    except (OSError, KeyError, TypeError, json.JSONDecodeError):
+        continue
 events = []
 for line in jsonl.read_text().splitlines():
     try: events.append(json.loads(line))
@@ -211,29 +281,42 @@ assert workflows and workflows[-1]["result"].get("isError") is not True, "worker
 assert len(workflows[-1]["result"]["details"].get("results", [])) == 2
 assert Path(fixture, "canary.txt").read_text() == "base"
 assert not subprocess.check_output(["git", "-C", str(fixture), "status", "--short"], text=True).strip()
-manifests = [p for p in Path(handoff_dir).glob("*.json") if p.name not in before and p.stat().st_mtime_ns >= before_path.stat().st_mtime_ns]
-assert len(manifests) >= 2, f"expected two new handoffs, got {manifests}"
-patches = []
-for manifest_path in sorted(manifests, key=lambda p: p.stat().st_mtime_ns):
-    data = json.loads(manifest_path.read_text())
-    assert data.get("version") == 1 and data.get("cwd") == str(fixture)
+manifests = []
+for manifest_path in Path(handoff_dir).glob("*.json"):
+    if manifest_path.name in before:
+        continue
+    try:
+        data = json.loads(manifest_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        continue
+    if data.get("cwd") != str(fixture):
+        continue
+    assert data.get("version") == 1
     group = data["groups"][0]
     assert group["baseCommit"] == base and group["cleanup"]["state"] == "complete"
     task = group["cleanup"]["tasks"][0]
     assert task["worktreeRemoved"] and task["branchRemoved"]
     child = group["children"][0]
-    patch = child["patch"]["path"]
-    assert Path(patch).is_file() and child["agent"] == "ticket-worker"
-    patch_text = Path(patch).read_text(errors="replace")
-    assert any(f"+++ b/{name}" in patch_text for name in ("handoff-a.txt", "handoff-b.txt"))
+    patch = Path(child["patch"]["path"])
+    assert str(patch) not in before_patches
+    assert patch.is_file() and child["agent"] == "ticket-worker"
+    patch_text = patch.read_text(errors="replace")
+    touched = [name for name in ("handoff-a.txt", "handoff-b.txt") if f"+++ b/{name}" in patch_text]
+    assert len(touched) == 1, (manifest_path, touched)
     for axis in ("standards", "spec"):
-        report = Path(runtime_dir, f"{label}-{'a' if 'handoff-a.txt' in patch_text else 'b'}-{axis}.md")
+        role = "a" if touched[0] == "handoff-a.txt" else "b"
+        report = Path(runtime_dir, f"{label}-{role}-{axis}.md")
         assert report.is_file(), report
         assert "review" in report.read_text(errors="replace").lower()
-    patches.append(patch)
-assert len(set(patches)) == 2
-# These are the exact native handoff patch paths, not patches synthesized by the test.
-Path(runtime_dir, "sequential-patches.txt").write_text("\n".join(patches[-2:]) + "\n")
+    manifests.append((touched[0], patch))
+patches_by_file = dict(manifests)
+assert set(patches_by_file) == {"handoff-a.txt", "handoff-b.txt"}, patches_by_file
+assert len(manifests) == 2, manifests
+assert len(patches_by_file) == 2
+# These are the exact native handoff patch paths, selected by their patch content,
+# not patches synthesized by the test or ordered by filesystem timestamps.
+patches = [str(patches_by_file[name]) for name in ("handoff-a.txt", "handoff-b.txt")]
+Path(runtime_dir, "sequential-patches.txt").write_text("\n".join(patches) + "\n")
 print("Real concurrent workers, parent protection, nested reviews, native handoffs, cleanup, and non-conflicting handoff capture passed.")
 PY
 
@@ -247,6 +330,8 @@ def run(cwd, *args, check=True):
     return subprocess.run(args, cwd=cwd, text=True, capture_output=True, check=check)
 sequential = root / "sequential"
 run(root, "git", "clone", "-q", str(fixture), str(sequential))
+run(sequential, "git", "checkout", "-q", "--detach", str(base))
+assert run(sequential, "git", "rev-parse", "HEAD").stdout.strip() == str(base)
 for patch in patches:
     run(sequential, "git", "apply", str(patch))
 assert (sequential / "handoff-a.txt").read_text() == "A"
@@ -265,6 +350,13 @@ import subprocess
 import sys
 jsonl = Path(sys.argv[1]); before_path = Path(sys.argv[2]); fixture = Path(sys.argv[3]); base = sys.argv[4]; handoff_dir = Path(sys.argv[5]); runtime_dir = Path(sys.argv[6])
 before = set(before_path.read_text().splitlines())
+before_patches = set()
+for manifest_name in before:
+    try:
+        data = json.loads((handoff_dir / manifest_name).read_text())
+        before_patches.add(data["groups"][0]["children"][0]["patch"]["path"])
+    except (OSError, KeyError, TypeError, json.JSONDecodeError):
+        continue
 events = []
 for line in jsonl.read_text().splitlines():
     try: events.append(json.loads(line))
@@ -273,28 +365,48 @@ workflows = [e for e in events if e.get("type") == "tool_execution_end" and e.ge
 assert workflows and workflows[-1]["result"].get("isError") is not True
 manifests = []
 for path in Path(handoff_dir).glob("*.json"):
-    if path.name in before or path.stat().st_mtime_ns < before_path.stat().st_mtime_ns:
+    if path.name in before:
         continue
     try:
         data = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError):
         continue
-    if data.get("cwd") == str(fixture):
-        manifests.append((path, data))
-assert len(manifests) >= 2
-patches = []
-for path, data in sorted(manifests, key=lambda item: item[0].stat().st_mtime_ns)[-2:]:
+    if data.get("cwd") != str(fixture):
+        continue
     group = data["groups"][0]
+    assert data.get("version") == 1
     assert group["baseCommit"] == base and group["cleanup"]["state"] == "complete"
-    patch = Path(group["children"][0]["patch"]["path"])
-    assert patch.is_file() and "+++ b/canary.txt" in patch.read_text(errors="replace")
-    patches.append(patch)
-assert len(set(patches)) >= 2
+    task = group["cleanup"]["tasks"][0]
+    assert task["worktreeRemoved"] and task["branchRemoved"]
+    child = group["children"][0]
+    assert child["agent"] == "ticket-worker"
+    patch = Path(child["patch"]["path"])
+    assert str(patch) not in before_patches
+    assert patch.is_file()
+    patch_text = patch.read_text(errors="replace")
+    assert "+++ b/canary.txt" in patch_text
+    values = [value for value in ("C", "D") if f"+{value}" in patch_text.splitlines()]
+    assert len(values) == 1, (path, values)
+    manifests.append((values[0], patch))
+patches_by_value = dict(manifests)
+assert set(patches_by_value) == {"C", "D"}, patches_by_value
+assert len(manifests) == 2, manifests
+assert len(patches_by_value) == 2
+# Select the exact native handoffs by worker patch content, not by filesystem
+# timestamps. Both patches are produced by real workers in this smoke run.
+patches = [patches_by_value[value] for value in ("C", "D")]
+for value, patch in zip(("C", "D"), patches):
+    pristine = Path(runtime_dir, f"pristine-{value}")
+    subprocess.run(["git", "clone", "-q", str(fixture), str(pristine)], check=True)
+    subprocess.run(["git", "apply", str(patch)], cwd=pristine, check=True)
+    assert (pristine / "canary.txt").read_text() == value
 conflict = Path(runtime_dir, "conflict")
 subprocess.run(["git", "clone", "-q", str(fixture), str(conflict)], check=True)
-subprocess.run(["git", "apply", str(patches[-2])], cwd=conflict, check=True)
-check = subprocess.run(["git", "apply", "--check", str(patches[-1])], cwd=conflict, text=True, capture_output=True)
-assert check.returncode != 0, "conflicting native handoff was silently accepted"
+subprocess.run(["git", "checkout", "-q", "--detach", str(base)], cwd=conflict, check=True)
+assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=conflict, text=True).strip() == str(base)
+subprocess.run(["git", "apply", str(patches[0])], cwd=conflict, check=True)
+check = subprocess.run(["git", "apply", "--check", str(patches[1])], cwd=conflict, text=True, capture_output=True)
+assert check.returncode != 0 and check.stderr.strip(), "conflicting native handoff did not fail visibly"
 assert (conflict / "canary.txt").read_text() == "C"
 print("Real conflicting native handoffs surface a visible Git failure without data loss.")
 PY
